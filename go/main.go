@@ -61,6 +61,9 @@ func fatal(err error) {
 	os.Exit(1)
 }
 
+// 收集指定天数内的每日代码变更统计
+//
+// 返回指定天数内的每日代码变更统计数组
 func collectDaily(days int, branch string) ([]DayStat, error) {
 	// git log --since=XX.days --date=short --pretty=format:@@@%ad --numstat [branch]
 	args := []string{"log", fmt.Sprintf("--since=%d.days", days), "--date=short", "--pretty=format:@@@%ad", "--numstat"}
@@ -83,6 +86,7 @@ func collectDaily(days int, branch string) ([]DayStat, error) {
 	removed := map[string]int{}
 	var curDate string
 
+	// 创建扫描器
 	sc := bufio.NewScanner(bytes.NewReader(out))
 	for sc.Scan() {
 		line := sc.Text()
@@ -119,7 +123,7 @@ func collectDaily(days int, branch string) ([]DayStat, error) {
 
 	var res []DayStat
 	for d := start; !d.After(today); d = d.AddDate(0, 0, 1) {
-		key := d.Format("2006-01-02")
+		key := d.Format(time.DateOnly)
 		res = append(res, DayStat{
 			Date:    d,
 			Added:   added[key],
@@ -135,7 +139,7 @@ func collectDaily(days int, branch string) ([]DayStat, error) {
 func renderSVG(days []DayStat, width, height int) string {
 	// Layout
 	const (
-		padL = 48
+		padL = 64
 		padR = 12
 		padT = 12
 		padB = 28
@@ -174,21 +178,25 @@ func renderSVG(days []DayStat, width, height int) string {
 		barW = 18
 	}
 
-	var b strings.Builder
-	b.Grow(32 * 1024)
-	b.WriteString(fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d">`, width, height, width, height))
-	b.WriteString(`<rect width="100%" height="100%" fill="white"/>`)
+	var svgBuilder strings.Builder
+	svgBuilder.Grow(32 * 1024)
+	svgBuilder.WriteString(fmt.Sprintf(`<svg xmlns="http://www.w3.org/2000/svg" width="%d" height="%d" viewBox="0 0 %d %d">`, width, height, width, height))
+	svgBuilder.WriteString(`<rect width="100%" height="100%" fill="white"/>`)
 
 	// grid lines (optional, light)
 	for i := 1; i <= 4; i++ {
 		yUp := baselineY - int(float64(maxBarH)*float64(i)/4.0)
 		yDn := baselineY + int(float64(maxBarH)*float64(i)/4.0)
-		b.WriteString(fmt.Sprintf(`<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#eee"/>`, padL, yUp, width-padR, yUp))
-		b.WriteString(fmt.Sprintf(`<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#eee"/>`, padL, yDn, width-padR, yDn))
+		svgBuilder.WriteString(fmt.Sprintf(`<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#eee"/>`, padL, yUp, width-padR, yUp))
+		svgBuilder.WriteString(fmt.Sprintf(`<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#eee"/>`, padL, yDn, width-padR, yDn))
+		tick := maxV * i / 4
+		svgBuilder.WriteString(fmt.Sprintf(`<text x="%d" y="%d" font-size="10" text-anchor="end" dominant-baseline="middle" fill="#666">+%s</text>`, padL-6, yUp, human(tick)))
+		svgBuilder.WriteString(fmt.Sprintf(`<text x="%d" y="%d" font-size="10" text-anchor="end" dominant-baseline="middle" fill="#666">-%s</text>`, padL-6, yDn, human(tick)))
 	}
 
 	// baseline
-	b.WriteString(fmt.Sprintf(`<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#333"/>`, padL, baselineY, width-padR, baselineY))
+	svgBuilder.WriteString(fmt.Sprintf(`<line x1="%d" y1="%d" x2="%d" y2="%d" stroke="#333"/>`, padL, baselineY, width-padR, baselineY))
+	svgBuilder.WriteString(fmt.Sprintf(`<text x="%d" y="%d" font-size="10" text-anchor="end" dominant-baseline="middle" fill="#666">0</text>`, padL-6, baselineY))
 
 	// bars
 	for i, d := range days {
@@ -201,12 +209,12 @@ func renderSVG(days []DayStat, width, height int) string {
 		// Added (upwards)
 		if addH > 0 {
 			y := baselineY - addH
-			b.WriteString(fmt.Sprintf(`<rect x="%d" y="%d" width="%d" height="%d" fill="#6cc04a"/>`, x, y, barW, addH))
+			svgBuilder.WriteString(fmt.Sprintf(`<rect x="%d" y="%d" width="%d" height="%d" fill="#6cc04a"/>`, x, y, barW, addH))
 		}
 		// Removed (downwards)
 		if remH > 0 {
 			y := baselineY
-			b.WriteString(fmt.Sprintf(`<rect x="%d" y="%d" width="%d" height="%d" fill="#e5533d"/>`, x, y, barW, remH))
+			svgBuilder.WriteString(fmt.Sprintf(`<rect x="%d" y="%d" width="%d" height="%d" fill="#e5533d"/>`, x, y, barW, remH))
 		}
 	}
 
@@ -223,7 +231,7 @@ func renderSVG(days []DayStat, width, height int) string {
 		}
 		x := float64(padL) + (float64(i)+0.5)*groupW
 		lbl := d.Date.Format("01-02")
-		b.WriteString(fmt.Sprintf(`<text x="%.1f" y="%d" font-size="10" text-anchor="middle" fill="#666">%s</text>`, x, height-10, lbl))
+		svgBuilder.WriteString(fmt.Sprintf(`<text x="%.1f" y="%d" font-size="10" text-anchor="middle" fill="#666">%s</text>`, x, height-10, lbl))
 	}
 
 	// Title
@@ -232,13 +240,16 @@ func renderSVG(days []DayStat, width, height int) string {
 		sumA += d.Added
 		sumR += d.Removed
 	}
-	b.WriteString(fmt.Sprintf(`<text x="%d" y="%d" font-size="12" fill="#111">Daily code churn (%d days): +%s  -%s</text>`,
+	svgBuilder.WriteString(fmt.Sprintf(`<text x="%d" y="%d" font-size="12" fill="#111">Daily code churn (%d days): +%s  -%s</text>`,
 		padL, 18, n, human(sumA), human(sumR)))
 
-	b.WriteString(`</svg>`)
-	return b.String()
+	svgBuilder.WriteString(`</svg>`)
+	return svgBuilder.String()
 }
 
+// 将数字格式化为人类易读的字符串
+//
+// 例如：240130 -> 240.1k
 func human(n int) string {
 	// simple compact format: 240130 -> 240.1k
 	if n < 1000 {
