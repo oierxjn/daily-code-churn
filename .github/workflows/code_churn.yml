@@ -11,8 +11,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: main
       - name: Run action
         uses: oierxjn/daily-code-churn@latest
         with:
           days: "30"
           out: "daily-churn.svg"
+          commit_branch: main

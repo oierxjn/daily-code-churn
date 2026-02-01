@@ -16,6 +16,7 @@ const branch = getInput("branch");
 const out = getInput("out");
 const width = getInput("width");
 const height = getInput("height");
+const commitBranchInput = getInput("commit_branch");
 
 function getEnv(name) {
   const v = process.env[name];
@@ -58,6 +59,14 @@ const bin = `./dist/daily-code-churn-${plat}-${arch}${ext}`;
 if (!fs.existsSync(bin)) {
   console.error(`Binary not found: ${bin}. Did you forget to build and commit dist/?`);
   process.exit(1);
+}
+if (process.platform !== "win32") {
+  try {
+    fs.chmodSync(bin, 0o755);
+  } catch (err) {
+    console.error(`Failed to chmod ${bin}:`, err.message || err);
+    process.exit(1);
+  }
 }
 
 const args = [];
@@ -106,7 +115,18 @@ try {
   execFileSync("git", ["config", "user.name", process.env.GITHUB_ACTOR || "github-actions[bot]"], { stdio: "inherit" });
   execFileSync("git", ["config", "user.email", `${process.env.GITHUB_ACTOR || "github-actions[bot]"}@users.noreply.github.com`], { stdio: "inherit" });
   execFileSync("git", ["commit", "-m", "chore: update churn output"], { stdio: "inherit" });
-  execFileSync("git", ["push"], { stdio: "inherit" });
+  let branch = commitBranchInput || getEnv("CHURN_COMMIT_BRANCH") || process.env.GITHUB_REF_NAME;
+  if (!branch) {
+    try {
+      const out = execFileSync("git", ["symbolic-ref", "--short", "HEAD"], { stdio: "pipe" });
+      branch = out.toString().trim();
+    } catch {}
+  }
+  if (!branch) {
+    console.error("No target branch specified. Set CHURN_COMMIT_BRANCH in your workflow.");
+    process.exit(1);
+  }
+  execFileSync("git", ["push", "origin", `HEAD:${branch}`], { stdio: "inherit" });
 } catch (err) {
   console.error("git commit/push failed:", err.message || err);
   process.exit(1);
