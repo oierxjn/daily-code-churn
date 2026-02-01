@@ -1,5 +1,6 @@
 const { execFileSync } = require("child_process");
 const fs = require("fs");
+const path = require("path");
 
 /**
  * 获取输入环境变量的值
@@ -55,7 +56,7 @@ if (!plat || !arch) {
 }
 
 const ext = process.platform === "win32" ? ".exe" : "";
-const bin = `./dist/daily-code-churn-${plat}-${arch}${ext}`;
+const bin = path.join(__dirname, "dist", "daily-code-churn-linux-amd64");
 if (!fs.existsSync(bin)) {
   console.error(`Binary not found: ${bin}. Did you forget to build and commit dist/?`);
   process.exit(1);
