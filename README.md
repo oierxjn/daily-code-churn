@@ -22,6 +22,7 @@ jobs:
         with:
           days: "30"
           out: "daily-churn.svg"
+          commit_branch: "main"
 ```
 
 ### Inputs
@@ -31,7 +32,7 @@ jobs:
 - `out`: Output SVG path (string, optional)
 - `width`: SVG width (string, optional)
 - `height`: SVG height (string, optional)
-- `commit_branch`: Target branch to push the generated output (string, optional)
+- `commit_branch`: Target branch to push the generated output (string, required)
 
 ### Environment variables
 
