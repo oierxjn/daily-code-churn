@@ -11,8 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: main
+        fetch-depth: 0
       - name: Run action
         uses: oierxjn/daily-code-churn@latest
         with:
