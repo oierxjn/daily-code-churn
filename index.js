@@ -17,6 +17,11 @@ const out = getInput("out");
 const width = getInput("width");
 const height = getInput("height");
 
+function getEnv(name) {
+  const v = process.env[name];
+  return (v === undefined || v === "") ? undefined : v;
+}
+
 function platformName() {
   switch (process.platform) {
     case "linux":
@@ -64,3 +69,45 @@ if (branch) args.push("-branch", branch);
 
 console.log("Running:", bin, args.join(" "));
 execFileSync(bin, args, { stdio: "inherit" });
+
+const outPath = out || getEnv("CHURN_OUT") || "daily-churn.svg";
+
+/**
+ * 检查指定路径的文件是否被Git修改
+ * @param {string} path - 需要检查的文件或目录路径
+ * @returns {boolean} - 如果文件被修改则返回true，否则返回false；出错时也返回false
+ */
+function gitChanged(path) {
+  try {
+    // 使用git status命令检查文件状态
+    // --porcelain参数以简洁格式输出状态信息
+    // --确保只检查指定路径
+    const out = execFileSync("git", ["status", "--porcelain", "--", path], { stdio: "pipe" });
+    // 将输出转为字符串并去除首尾空白，如果结果不为空则表示文件有变更
+    return out.toString().trim() !== "";
+  } catch (err) {
+    console.error("git status failed:", err.message || err);
+    return false;
+  }
+}
+
+if (!fs.existsSync(outPath)) {
+  console.error(`Output not found: ${outPath}`);
+  process.exit(1);
+}
+
+if (!gitChanged(outPath)) {
+  console.log(`No changes in ${outPath}`);
+  process.exit(0);
+}
+
+try {
+  execFileSync("git", ["add", outPath], { stdio: "inherit" });
+  execFileSync("git", ["config", "user.name", process.env.GITHUB_ACTOR || "github-actions[bot]"], { stdio: "inherit" });
+  execFileSync("git", ["config", "user.email", `${process.env.GITHUB_ACTOR || "github-actions[bot]"}@users.noreply.github.com`], { stdio: "inherit" });
+  execFileSync("git", ["commit", "-m", "chore: update churn output"], { stdio: "inherit" });
+  execFileSync("git", ["push"], { stdio: "inherit" });
+} catch (err) {
+  console.error("git commit/push failed:", err.message || err);
+  process.exit(1);
+}

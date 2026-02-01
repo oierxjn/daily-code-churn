@@ -1,9 +1,10 @@
-name: build
+name: build-and-commit-dist
 
 on:
   workflow_dispatch:
-  push:
-    branches: [ main ]
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -18,8 +19,14 @@ jobs:
       - name: Build binaries
         run: bash scripts/build.sh
 
-      - name: Upload dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: dist
-          path: dist
+      - name: Commit dist
+        run: |
+          if git diff --quiet --exit-code -- dist; then
+            echo "No changes in dist/"
+            exit 0
+          fi
+          git add dist
+          git config user.name "${GITHUB_ACTOR}"
+          git config user.email "${GITHUB_ACTOR}@users.noreply.github.com"
+          git commit -m "build: update dist"
+          git push
