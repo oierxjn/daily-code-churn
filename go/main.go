@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"sort"
@@ -21,11 +22,11 @@ type DayStat struct {
 
 func main() {
 	var (
-		days    = flag.Int("days", 30, "How many days to include")
-		branch  = flag.String("branch", "", "Branch/ref to analyze (optional)")
-		outPath = flag.String("out", "daily-churn.svg", "Output SVG path")
-		width   = flag.Int("width", 1000, "SVG width")
-		height  = flag.Int("height", 320, "SVG height")
+		days    = flag.Int("days", envInt("CHURN_DAYS", 30), "How many days to include")
+		branch  = flag.String("branch", envString("CHURN_BRANCH", ""), "Branch/ref to analyze (optional)")
+		outPath = flag.String("out", envString("CHURN_OUT", "daily-churn.svg"), "Output SVG path")
+		width   = flag.Int("width", envInt("CHURN_WIDTH", 1000), "SVG width")
+		height  = flag.Int("height", envInt("CHURN_HEIGHT", 320), "SVG height")
 	)
 	flag.Parse()
 
@@ -59,6 +60,25 @@ func dirOf(p string) string {
 func fatal(err error) {
 	fmt.Fprintln(os.Stderr, "error:", err)
 	os.Exit(1)
+}
+
+func envString(key, fallback string) string {
+	if v, ok := os.LookupEnv(key); ok {
+		return v
+	}
+	return fallback
+}
+
+// envInt 从环境变量中获取整数
+//
+// 如果环境变量 `key` 不存在或解析失败，则返回默认值 `fallback`
+func envInt(key string, fallback int) int {
+	if v, ok := os.LookupEnv(key); ok {
+		if n, err := strconv.Atoi(strings.TrimSpace(v)); err == nil {
+			return n
+		}
+	}
+	return fallback
 }
 
 // 收集指定天数内的每日代码变更统计
@@ -219,12 +239,7 @@ func renderSVG(days []DayStat, width, height int) string {
 	}
 
 	// X axis labels (sparse)
-	labelEvery := 1
-	if n > 45 {
-		labelEvery = 7
-	} else if n > 20 {
-		labelEvery = 3
-	}
+	labelEvery := labelEveryFor(innerW, n, 10)
 	for i, d := range days {
 		if i%labelEvery != 0 && i != n-1 {
 			continue
@@ -245,6 +260,20 @@ func renderSVG(days []DayStat, width, height int) string {
 
 	svgBuilder.WriteString(`</svg>`)
 	return svgBuilder.String()
+}
+
+// 测算标签间隔
+func labelEveryFor(innerW, n, fontSize int) int {
+	if n <= 0 || innerW <= 0 {
+		return 1
+	}
+	groupW := float64(innerW) / float64(n)
+	minLabelW := float64(fontSize) * 5.5
+	every := int(math.Ceil(minLabelW / groupW))
+	if every < 1 {
+		return 1
+	}
+	return every
 }
 
 // 将数字格式化为人类易读的字符串
