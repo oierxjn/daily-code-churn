@@ -2,17 +2,18 @@
 set -euo pipefail
 
 root_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-cd "$root_dir"
+go_dir="$root_dir/go"
+dist_dir="$root_dir/dist"
 
-mkdir -p dist
+mkdir -p "$dist_dir"
 
 build() {
   local goos="$1"
   local goarch="$2"
   local ext="$3"
-  local out="dist/daily-code-churn-${goos}-${goarch}${ext}"
+  local out="$dist_dir/daily-code-churn-${goos}-${goarch}${ext}"
   echo "Building ${out}"
-  GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 go build -trimpath -o "$out" ./go
+  (cd "$go_dir" && GOOS="$goos" GOARCH="$goarch" CGO_ENABLED=0 go build -trimpath -o "$out" .)
 }
 
 build linux amd64 ""
