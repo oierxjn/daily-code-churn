@@ -13,11 +13,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          ref: metrics-renders
       - name: Run action
         uses: oierxjn/daily-code-churn@latest
         with:
           days: "30"
           out: "daily-churn.svg"
-          branch: "main"
           commit_branch: "metrics-renders"
