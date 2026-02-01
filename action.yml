@@ -18,6 +18,9 @@ inputs:
   height:
     description: SVG height.
     required: false
+  commit_branch:
+    description: Target branch to push the generated output.
+    required: true
 
 runs:
   using: node20

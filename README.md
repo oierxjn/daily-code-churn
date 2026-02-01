@@ -31,6 +31,7 @@ jobs:
 - `out`: Output SVG path (string, optional)
 - `width`: SVG width (string, optional)
 - `height`: SVG height (string, optional)
+- `commit_branch`: Target branch to push the generated output (string, optional)
 
 ### Environment variables
 
@@ -47,7 +48,7 @@ Precedence: `with:` inputs > `CHURN_*` env > built-in defaults.
 ## Output commit behavior
 
 This Action commits the generated output file back to the repository by default.
-Make sure your workflow grants `contents: write` permission.
+Make sure your workflow grants `contents: write` permission and set `commit_branch`.
 
 ## Workflows in this repo
 
