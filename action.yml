@@ -1,0 +1,24 @@
+name: daily-code-churn
+description: Generate a daily code churn SVG from git history.
+author: daily-code-churn
+
+inputs:
+  days:
+    description: How many days to include.
+    required: false
+  branch:
+    description: Branch/ref to analyze (optional).
+    required: false
+  out:
+    description: Output SVG path.
+    required: false
+  width:
+    description: SVG width.
+    required: false
+  height:
+    description: SVG height.
+    required: false
+
+runs:
+  using: node20
+  main: index.js
