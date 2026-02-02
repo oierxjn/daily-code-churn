@@ -18,4 +18,4 @@ jobs:
         with:
           days: "30"
           out: "daily-churn.svg"
-          commit_branch: "metrics-renders"
+          commit_branch: "main"
