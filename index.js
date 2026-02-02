@@ -77,6 +77,38 @@ if (width) args.push("-width", width);
 if (height) args.push("-height", height);
 if (branch) args.push("-branch", branch);
 
+let targetBranch = commitBranchInput || getEnv("CHURN_COMMIT_BRANCH") || process.env.GITHUB_REF_NAME;
+if (!targetBranch) {
+  try {
+    const out = execFileSync("git", ["symbolic-ref", "--short", "HEAD"], { stdio: "pipe" });
+    targetBranch = out.toString().trim();
+  } catch {}
+}
+if (!targetBranch) {
+  console.error("No target branch specified. Set CHURN_COMMIT_BRANCH in your workflow.");
+  process.exit(1);
+}
+
+// Switch to the target branch before generating output to avoid stash conflicts.
+const status = execFileSync("git", ["status", "--porcelain"], { stdio: "pipe" }).toString().trim();
+if (status !== "") {
+  console.error("Working tree is dirty; aborting before checkout.");
+  process.exit(1);
+}
+let hasRemote = false;
+try {
+  execFileSync("git", ["fetch", "origin", targetBranch], { stdio: "inherit" });
+  execFileSync("git", ["show-ref", "--verify", `refs/remotes/origin/${targetBranch}`], { stdio: "pipe" });
+  hasRemote = true;
+} catch {
+  hasRemote = false;
+}
+if (hasRemote) {
+  execFileSync("git", ["checkout", "-B", targetBranch, `origin/${targetBranch}`], { stdio: "inherit" });
+} else {
+  execFileSync("git", ["checkout", "-B", targetBranch], { stdio: "inherit" });
+}
+
 console.log("Running:", bin, args.join(" "));
 execFileSync(bin, args, { stdio: "inherit" });
 
@@ -112,48 +144,11 @@ if (!gitChanged(outPath)) {
 }
 
 try {
-  let branch = commitBranchInput || getEnv("CHURN_COMMIT_BRANCH") || process.env.GITHUB_REF_NAME;
-  if (!branch) {
-    try {
-      const out = execFileSync("git", ["symbolic-ref", "--short", "HEAD"], { stdio: "pipe" });
-      branch = out.toString().trim();
-    } catch {}
-  }
-  if (!branch) {
-    console.error("No target branch specified. Set CHURN_COMMIT_BRANCH in your workflow.");
-    process.exit(1);
-  }
-
-  // Ensure we are on the target branch so push is fast-forward.
-  const status = execFileSync("git", ["status", "--porcelain"], { stdio: "pipe" }).toString().trim();
-  const needsStash = status !== "";
-  let stashed = false;
-  if (needsStash) {
-    execFileSync("git", ["stash", "push", "-u", "-m", "churn-output"], { stdio: "inherit" });
-    stashed = true;
-  }
-  let hasRemote = false;
-  try {
-    execFileSync("git", ["fetch", "origin", branch], { stdio: "inherit" });
-    execFileSync("git", ["show-ref", "--verify", `refs/remotes/origin/${branch}`], { stdio: "pipe" });
-    hasRemote = true;
-  } catch {
-    hasRemote = false;
-  }
-  if (hasRemote) {
-    execFileSync("git", ["checkout", "-B", branch, `origin/${branch}`], { stdio: "inherit" });
-  } else {
-    execFileSync("git", ["checkout", "-B", branch], { stdio: "inherit" });
-  }
-  if (stashed) {
-    execFileSync("git", ["stash", "pop"], { stdio: "inherit" });
-  }
-
   execFileSync("git", ["add", outPath], { stdio: "inherit" });
   execFileSync("git", ["config", "user.name", process.env.GITHUB_ACTOR || "github-actions[bot]"], { stdio: "inherit" });
   execFileSync("git", ["config", "user.email", `${process.env.GITHUB_ACTOR || "github-actions[bot]"}@users.noreply.github.com`], { stdio: "inherit" });
   execFileSync("git", ["commit", "-m", "chore: update churn output"], { stdio: "inherit" });
-  execFileSync("git", ["push", "origin", `HEAD:${branch}`], { stdio: "inherit" });
+  execFileSync("git", ["push", "origin", `HEAD:${targetBranch}`], { stdio: "inherit" });
 } catch (err) {
   console.error("git commit/push failed:", err.message || err);
   process.exit(1);
