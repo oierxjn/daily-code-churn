@@ -77,14 +77,14 @@ if (width) args.push("-width", width);
 if (height) args.push("-height", height);
 if (branch) args.push("-branch", branch);
 
-let targetBranch = commitBranchInput || getEnv("CHURN_COMMIT_BRANCH") || process.env.GITHUB_REF_NAME;
-if (!targetBranch) {
+let outputBranch = commitBranchInput || getEnv("CHURN_COMMIT_BRANCH") || process.env.GITHUB_REF_NAME;
+if (!outputBranch) {
   try {
     const out = execFileSync("git", ["symbolic-ref", "--short", "HEAD"], { stdio: "pipe" });
-    targetBranch = out.toString().trim();
+    outputBranch = out.toString().trim();
   } catch {}
 }
-if (!targetBranch) {
+if (!outputBranch) {
   console.error("No target branch specified. Set CHURN_COMMIT_BRANCH in your workflow.");
   process.exit(1);
 }
@@ -97,16 +97,16 @@ if (status !== "") {
 }
 let hasRemote = false;
 try {
-  execFileSync("git", ["fetch", "origin", targetBranch], { stdio: "inherit" });
-  execFileSync("git", ["show-ref", "--verify", `refs/remotes/origin/${targetBranch}`], { stdio: "pipe" });
+  execFileSync("git", ["fetch", "origin", outputBranch], { stdio: "inherit" });
+  execFileSync("git", ["show-ref", "--verify", `refs/remotes/origin/${outputBranch}`], { stdio: "pipe" });
   hasRemote = true;
 } catch {
   hasRemote = false;
 }
 if (hasRemote) {
-  execFileSync("git", ["checkout", "-B", targetBranch, `origin/${targetBranch}`], { stdio: "inherit" });
+  execFileSync("git", ["checkout", "-B", outputBranch, `origin/${outputBranch}`], { stdio: "inherit" });
 } else {
-  execFileSync("git", ["checkout", "-B", targetBranch], { stdio: "inherit" });
+  execFileSync("git", ["checkout", "-B", outputBranch], { stdio: "inherit" });
 }
 
 console.log("Running:", bin, args.join(" "));
@@ -148,7 +148,7 @@ try {
   execFileSync("git", ["config", "user.name", process.env.GITHUB_ACTOR || "github-actions[bot]"], { stdio: "inherit" });
   execFileSync("git", ["config", "user.email", `${process.env.GITHUB_ACTOR || "github-actions[bot]"}@users.noreply.github.com`], { stdio: "inherit" });
   execFileSync("git", ["commit", "-m", "chore: update churn output"], { stdio: "inherit" });
-  execFileSync("git", ["push", "origin", `HEAD:${targetBranch}`], { stdio: "inherit" });
+  execFileSync("git", ["push", "origin", `HEAD:${outputBranch}`], { stdio: "inherit" });
 } catch (err) {
   console.error("git commit/push failed:", err.message || err);
   process.exit(1);
